@@ -1,0 +1,34 @@
+# https://github.com/awesome-containers/static-bash
+ARG STATIC_BASH_VERSION=5.2.15
+ARG STATIC_BASH_IMAGE=ghcr.io/awesome-containers/static-bash
+
+# https://github.com/awesome-containers/static-bzip2
+ARG STATIC_BZIP2_VERSION=1.0.8
+ARG STATIC_BZIP2_IMAGE=ghcr.io/awesome-containers/static-bzip2
+
+# https://github.com/awesome-containers/alpine-build-essential
+ARG BUILD_ESSENTIAL_VERSION=3.17
+ARG BUILD_ESSENTIAL_IMAGE=ghcr.io/awesome-containers/alpine-build-essential
+
+
+FROM $STATIC_BASH_IMAGE:$STATIC_BASH_VERSION-slim AS static-bash
+FROM $STATIC_BZIP2_IMAGE:$STATIC_BZIP2_VERSION AS static-bzip2
+FROM $BUILD_ESSENTIAL_IMAGE:$BUILD_ESSENTIAL_VERSION AS build
+
+WORKDIR /src/bzip2
+COPY --from=static-bzip2 /bin/ ./
+# hadolint ignore=SC2044,DL4006
+RUN set -xeu; \
+    rm -f bash sh; \
+    for bin in $(find . -executable -type f); do \
+        file "$bin" -b --mime-type | grep -qw 'application/x-executable' || \
+            continue; \
+        ! ldd "$bin" && :; \
+        upx --no-progress --no-color "$bin"; \
+        upx -t --no-progress --no-color "$bin"; \
+    done; \
+    ./bzip2 --version
+
+# slim static bzip2 image
+FROM static-bash
+COPY --from=build /src/bzip2/ /bin/
